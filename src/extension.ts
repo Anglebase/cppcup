@@ -3,6 +3,25 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import toml from '@iarna/toml';
+
+function get_terminal() {
+	const workspace = vscode.workspace.workspaceFolders;
+	if (!workspace || workspace.length > 1) {
+		throw new Error('Workspace error.');
+	}
+	const folder = workspace[0];
+
+	let terminal = vscode.window.terminals.find(t => t.name === 'Cup');
+	if (!terminal) {
+		terminal = vscode.window.createTerminal({
+			name: 'Cup',
+			cwd: folder.uri,
+			hideFromUser: true,
+		});
+	}
+	return terminal;
+}
 
 function build_project() {
 	console.log('build project');
@@ -25,18 +44,10 @@ function build_project() {
 		return;
 	}
 
-	// 获取终端实例
-	let terminal = vscode.window.terminals.find(t => t.name === 'Cup');
-	if (!terminal) {
-		terminal = vscode.window.createTerminal({
-			name: 'Cup',
-			cwd: folder.uri,
-			hideFromUser: true,
-		});
-	}
+	let terminal = get_terminal();
 
 	// 执行自动构建
-	let msg = vscode.window.setStatusBarMessage('$(sync)Building...');
+	let msg = vscode.window.setStatusBarMessage('$(loading~spin)Building...');
 	terminal.show();
 	terminal.sendText("cup build");
 	vscode.window.onDidEndTerminalShellExecution((e) => {
@@ -44,30 +55,109 @@ function build_project() {
 			return;
 		}
 		msg.dispose();
-		if (e.exitCode === 0) {
-			vscode.window.setStatusBarMessage('$(check)Build succeeded.', 5000);
-			// 构建成功则关闭终端
-			e.terminal.dispose();
-		} else {
-			vscode.window.setStatusBarMessage('$(error)Build failed.', 5000);
-		}
+		vscode.window.setStatusBarMessage(
+			e.exitCode === 0
+				? '$(check)Build success.'
+				: '$(error)Build failed.',
+			3000);
 	});
 }
 
+function run_project(is_debug: boolean, dir: string) {
+	console.log('run project');
+	const parentpath = path.dirname(dir);
+	const name = path.basename(parentpath);
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+	let terminal = get_terminal();
+	terminal.show();
+
+	// 对于根目录的运行命令，只对 binary 类型的项目生效
+	if (dir === '' || (name !== "examples" && name !== "tests")) {
+		terminal.sendText("cup run" + (!is_debug ? " -r" : ""));
+		let msg = vscode.window.setStatusBarMessage('$(loading~spin)Running...');
+		vscode.window.onDidEndTerminalShellExecution((e) => {
+			if (e.terminal.name !== 'Cup') {
+				return;
+			}
+			msg.dispose();
+			vscode.window.setStatusBarMessage(
+				e.exitCode === 0
+					? '$(check)Run success.'
+					: '$(error)Run failed.',
+				3000);
+		});
+		return;
+	}
+
+	// 对于 examples 和 tests 目录下的运行命令，需要指定具体的源文件
+	const source_name = path.basename(dir);
+	terminal.sendText("cup run " + (name + "/" + source_name) + (!is_debug ? " -r" : ""));
+	let msg = vscode.window.setStatusBarMessage('$(loading~spin)Running...');
+	vscode.window.onDidEndTerminalShellExecution((e) => {
+		if (e.terminal.name !== 'Cup') {
+			return;
+		}
+		msg.dispose();
+		vscode.window.setStatusBarMessage(
+			e.exitCode === 0
+				? '$(check)Run success.'
+				: '$(error)Run failed.',
+			3000);
+	});
+}
+
+// 更新编辑器标题栏运行按钮的可见性
+function update_button_visibility() {
+	const workspace = vscode.workspace.workspaceFolders;
+	if (workspace && workspace.length === 1) {
+		const folder = workspace[0];
+		const config_path = path.join(folder.uri.fsPath, 'cup.toml');
+		vscode.workspace.fs.readFile(vscode.Uri.file(config_path)).then((content) => {
+			const config = toml.parse(content.toString());
+			// 检查 project.type 字段
+			if (config.project && typeof config.project === 'object' && 'type' in config.project) {
+				const type = config.project.type;
+				const active_dir = vscode.window.activeTextEditor?.document.uri.fsPath;
+				let is_examples_or_tests = false;
+				if (active_dir) {
+					const parentpath = path.dirname(active_dir);
+					const name = path.basename(parentpath);
+					is_examples_or_tests = name === "examples" || name === "tests";
+				}
+				// 仅当项目类型为 binary 或 examples、tests 目录下的文件时，显示运行按钮
+				const runable = type === 'binary' || is_examples_or_tests;
+				vscode.commands.executeCommand('setContext', 'cppcup.runable', runable);
+			}
+		});
+	}
+}
+
 export function activate(context: vscode.ExtensionContext) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "cppcup" is now active!');
 
-	const build_disposable = vscode.commands.registerCommand('cppcup.build', build_project);
-	context.subscriptions.push(build_disposable);
+	context.subscriptions.push(vscode.commands.registerCommand('cppcup.build', build_project));
+	context.subscriptions.push(vscode.commands.registerCommand('cppcup.run', (url: vscode.Uri) => { run_project(false, url.fsPath); }));
+	context.subscriptions.push(vscode.commands.registerCommand('cppcup.debug', (url: vscode.Uri) => { run_project(true, url.fsPath); }));
+
+	update_button_visibility();
+
+	vscode.workspace.onDidSaveTextDocument(
+		(document) => {
+			console.log('onDidChangeTextDocument', document);
+			if (document.fileName.endsWith('cup.toml')) {
+				update_button_visibility();
+				console.log('cup.toml saved');
+			}
+		}
+	);
+	vscode.window.onDidChangeActiveTextEditor(
+		(editor) => {
+			console.log('onDidChangeActiveTextEditor', editor);
+			update_button_visibility();
+		}
+	);
 
 	build_project();
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() { }
