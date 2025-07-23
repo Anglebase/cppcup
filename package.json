@@ -1,21 +1,45 @@
 {
   "name": "cppcup",
-  "displayName": "cppcup",
+  "displayName": "Cup",
   "description": "A new C/C++ Project&Package Manager support for VSCode.",
   "version": "0.0.1",
+  "keywords": [
+    "cpp",
+    "c++",
+    "c",
+    "cup"
+  ],
+  "publisher": "Anglebase",
   "engines": {
     "vscode": "^1.102.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:cup.toml"
+  ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Cup",
+      "properties": {
+        "Cup.atPath": {
+          "type": "string",
+          "default": "",
+          "description": "The path of the cup executable file. If empty, the extension will try to find it in the environment variable."
+        },
+        "Cup.autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to automatically update the c_cpp_properties.json file."
+        }
+      }
+    },
     "commands": [
       {
-        "command": "cppcup.helloWorld",
-        "title": "Hello World"
+        "command": "cppcup.build",
+        "title": "Build"
       }
     ]
   },
