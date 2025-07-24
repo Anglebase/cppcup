@@ -43,14 +43,19 @@
         "icon": "$(project)"
       },
       {
-        "command": "cppcup.run",
-        "title": "Run",
-        "icon": "$(run)"
+        "command": "cppcup.release",
+        "title": "Build with Release",
+        "icon": "$(package)"
       },
       {
         "command": "cppcup.debug",
         "title": "Run with Debug",
         "icon": "$(debug-alt)"
+      },
+      {
+        "command": "cppcup.run",
+        "title": "Run",
+        "icon": "$(run)"
       }
     ],
     "menus": {
@@ -58,6 +63,11 @@
         {
           "when": "true",
           "command": "cppcup.build",
+          "group": "navigation"
+        },
+        {
+          "when": "true",
+          "command": "cppcup.release",
           "group": "navigation"
         },
         {

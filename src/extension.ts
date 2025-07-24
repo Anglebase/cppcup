@@ -23,7 +23,7 @@ function get_terminal() {
 	return terminal;
 }
 
-function build_project() {
+function build_project(is_debug: boolean) {
 	console.log('build project');
 	const workspace = vscode.workspace.workspaceFolders;
 	if (!workspace) {
@@ -49,7 +49,7 @@ function build_project() {
 	// 执行自动构建
 	let msg = vscode.window.setStatusBarMessage('$(loading~spin)Building...');
 	terminal.show();
-	terminal.sendText("cup build");
+	terminal.sendText("cup build" + (!is_debug ? " -r" : ""));
 	vscode.window.onDidEndTerminalShellExecution((e) => {
 		if (e.terminal.name !== 'Cup') {
 			return;
@@ -135,9 +135,10 @@ function update_button_visibility() {
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Congratulations, your extension "cppcup" is now active!');
 
-	context.subscriptions.push(vscode.commands.registerCommand('cppcup.build', build_project));
+	context.subscriptions.push(vscode.commands.registerCommand('cppcup.build', () => { build_project(true); }));
 	context.subscriptions.push(vscode.commands.registerCommand('cppcup.run', (url: vscode.Uri) => { run_project(false, url.fsPath); }));
 	context.subscriptions.push(vscode.commands.registerCommand('cppcup.debug', (url: vscode.Uri) => { run_project(true, url.fsPath); }));
+	context.subscriptions.push(vscode.commands.registerCommand('cppcup.release', () => { build_project(false); }));
 
 	update_button_visibility();
 
@@ -157,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	);
 
-	build_project();
+	build_project(true);
 }
 
 export function deactivate() { }
