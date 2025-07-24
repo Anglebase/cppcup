@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import toml from '@iarna/toml';
+import { language_activate } from './language';
 
 function get_terminal() {
 	const workspace = vscode.workspace.workspaceFolders;
@@ -135,6 +136,8 @@ function update_button_visibility() {
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Congratulations, your extension "cppcup" is now active!');
 
+	language_activate(context);
+
 	context.subscriptions.push(vscode.commands.registerCommand('cppcup.build', () => { build_project(true); }));
 	context.subscriptions.push(vscode.commands.registerCommand('cppcup.run', (url: vscode.Uri) => { run_project(false, url.fsPath); }));
 	context.subscriptions.push(vscode.commands.registerCommand('cppcup.debug', (url: vscode.Uri) => { run_project(true, url.fsPath); }));
@@ -158,7 +161,10 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	);
 
-	build_project(true);
+	const auto_update = vscode.workspace.getConfiguration().get<boolean>('cppcup.autoUpdate');
+	if (auto_update) { 
+		build_project(true);
+	}
 }
 
 export function deactivate() { }

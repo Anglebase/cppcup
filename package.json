@@ -24,15 +24,15 @@
     "configuration": {
       "title": "Cup",
       "properties": {
-        "Cup.atPath": {
+        "cppcup.atPath": {
           "type": "string",
           "default": "",
           "description": "The path of the cup executable file. If empty, the extension will try to find it in the environment variable."
         },
-        "Cup.autoUpdate": {
+        "cppcup.autoUpdate": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to automatically update the c_cpp_properties.json file."
+          "description": "When opening VSCode, does it automatically build the Cup project to synchronize dependencies."
         }
       }
     },
