@@ -2,7 +2,7 @@
   "name": "cppcup",
   "displayName": "Cup",
   "description": "VSCode supports the new C/C++ Project&Package Manager Cup.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "url": "https://github.com/Anglebase/cppcup.git"
   },
