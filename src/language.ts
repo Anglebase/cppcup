@@ -23,6 +23,7 @@ function get_field_name(document: vscode.TextDocument, position: vscode.Position
     return name;
 }
 
+// 代码补全公共数据
 class CompletionItemProvider implements vscode.CompletionItemProvider {
     public static keywords = [
         'project',
@@ -176,7 +177,6 @@ class CompletionItemProvider implements vscode.CompletionItemProvider {
         { label: '23', description: 'Since CMake 3.20, C++23' },
         { label: '26', description: 'Since CMake 3.25, C++26' },
     ];
-
     public static types = [
         'binary',
         'static',
@@ -201,6 +201,7 @@ class CompletionItemProvider implements vscode.CompletionItemProvider {
     }
 };
 
+// 针对于字符串的补全
 class QuotesCompletionItemProvider implements vscode.CompletionItemProvider {
     provideCompletionItems(
         document: vscode.TextDocument,
@@ -263,6 +264,7 @@ class QuotesCompletionItemProvider implements vscode.CompletionItemProvider {
     };
 };
 
+// 针对于数字的补全
 class NumberCompletionItemProvider implements vscode.CompletionItemProvider {
     provideCompletionItems(
         document: vscode.TextDocument,
@@ -312,6 +314,7 @@ class NumberCompletionItemProvider implements vscode.CompletionItemProvider {
     }
 };
 
+// 针对于路径项的补全
 class PathCompletionItemProvider implements vscode.CompletionItemProvider {
     provideCompletionItems(
         document: vscode.TextDocument,
@@ -361,6 +364,7 @@ class PathCompletionItemProvider implements vscode.CompletionItemProvider {
 };
 
 export function language_activate(context: vscode.ExtensionContext) {
+    // 代码补全
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new CompletionItemProvider()));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',

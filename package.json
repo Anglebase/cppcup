@@ -21,21 +21,6 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "configuration": {
-      "title": "Cup",
-      "properties": {
-        "cppcup.atPath": {
-          "type": "string",
-          "default": "",
-          "description": "The path of the cup executable file. If empty, the extension will try to find it in the environment variable."
-        },
-        "cppcup.autoUpdate": {
-          "type": "boolean",
-          "default": true,
-          "description": "When opening VSCode, does it automatically build the Cup project to synchronize dependencies."
-        }
-      }
-    },
     "commands": [
       {
         "command": "cppcup.build",
@@ -61,12 +46,12 @@
     "menus": {
       "editor/title": [
         {
-          "when": "true",
+          "when": "cppcup.buildable",
           "command": "cppcup.build",
           "group": "navigation"
         },
         {
-          "when": "true",
+          "when": "cppcup.buildable",
           "command": "cppcup.release",
           "group": "navigation"
         },
@@ -79,6 +64,28 @@
           "when": "cppcup.runable",
           "command": "cppcup.debug",
           "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "true",
+          "command": "cppcup.build",
+          "group": "cppcup"
+        },
+        {
+          "when": "true",
+          "command": "cppcup.release",
+          "group": "cppcup"
+        },
+        {
+          "when": "true",
+          "command": "cppcup.run",
+          "group": "cppcup"
+        },
+        {
+          "when": "true",
+          "command": "cppcup.debug",
+          "group": "cppcup"
         }
       ]
     }
