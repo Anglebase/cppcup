@@ -351,9 +351,10 @@ class PathCompletionItemProvider implements vscode.CompletionItemProvider {
             const last_quote = prefix.lastIndexOf('"') > prefix.lastIndexOf("'") ? '"' : "'";
             const last_slash = prefix.lastIndexOf('/') > prefix.lastIndexOf('\\') ? '/' : '\\';
             let dir = prefix.slice(prefix.lastIndexOf(last_quote) + 1, prefix.lastIndexOf(last_slash) + 1);
-            if (!dir) { dir = document.uri.fsPath; }
+            const root_dir = path.dirname(document.uri.fsPath);
+            if (!dir) { dir = root_dir; }
             if (!path.isAbsolute(dir)) {
-                dir = path.join(document.uri.fsPath, dir);
+                dir = path.join(root_dir, dir);
             }
             // 解析路径所定位的位置
             dir = path.normalize(dir);
