@@ -482,8 +482,8 @@ class DotCompletionItemProvider implements vscode.CompletionItemProvider {
                 { label: 'debug' },
                 { label: 'release' }
             ];
-            if (/\[[ ]*build[ ]*\.[ ]*export[ ]*\]/g.test(before_cursor)) {
-                items.push({ label: 'compile_commands' });
+            if (/\[[ ]*build[ ]*\./g.test(before_cursor)) {
+                items.push({ label: 'export' });
             }
             return items.map(item => {
                 return new vscode.CompletionItem(item.label, vscode.CompletionItemKind.Property);
