@@ -1,5 +1,0 @@
-CodeBlocks
-CodeLite
-Eclipse CDT4
-Kate
-Sublime Text 2

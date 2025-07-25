@@ -23,9 +23,57 @@ function get_field_name(document: vscode.TextDocument, position: vscode.Position
     return name;
 }
 
+function get_table_title(document: vscode.TextDocument, position: vscode.Position) {
+    let line = position.line;
+    let find = false;
+    while (line >= 0) {
+        if (/^\[.*?\]$/gm.test(document.lineAt(line).text.trim())) {
+            find = true;
+            break;
+        }
+        line--;
+    }
+    return find ? document.lineAt(line).text.trim() : null;
+}
+
+function check_pairs(document: vscode.TextDocument, position: vscode.Position) {
+    const before = document.getText(new vscode.Range(new vscode.Position(0, 0), position));
+    let in_quote1 = false;
+    let in_quote2 = false;
+    let stack = [];
+    for (const c of before) {
+        switch (c) {
+            case '"':
+                if (!in_quote2) { in_quote1 = !in_quote1; }
+                break;
+            case "'":
+                if (!in_quote1) { in_quote2 = !in_quote2; }
+                break;
+            case '{':
+            case '(':
+            case '[':
+                stack.push(c);
+                break;
+            case '}':
+                if (stack.length > 0 && stack[stack.length - 1] === '{') { stack.pop(); }
+                else { return false; }
+                break;
+            case ')':
+                if (stack.length > 0 && stack[stack.length - 1] === '(') { stack.pop(); }
+                else { return false; }
+                break;
+            case ']':
+                if (stack.length > 0 && stack[stack.length - 1] === '[') { stack.pop(); }
+                else { return false; }
+                break;
+        }
+    }
+    return stack.length === 0;
+}
+
 // 代码补全公共数据
 class CompletionItemProvider implements vscode.CompletionItemProvider {
-    public static keywords = [
+    public static tables = [
         'project',
         'build',
         'target',
@@ -33,34 +81,6 @@ class CompletionItemProvider implements vscode.CompletionItemProvider {
         'features',
         'feature',
         'dependecies',
-
-        'name',
-        'type',
-        'version',
-        'license',
-
-        'jobs',
-        'stdc',
-        'stdcxx',
-        'features',
-
-        'sources',
-        'defines',
-        'includes',
-        'link_dirs',
-        'link_libs',
-        'link_options',
-        'compile_options',
-        'compiler_features',
-
-        'export',
-        'compile_commands',
-
-        'debug',
-        'release',
-
-        'url',
-        'path',
         'tests',
         'examples'
     ];
@@ -194,10 +214,6 @@ class CompletionItemProvider implements vscode.CompletionItemProvider {
         if (!document.fileName.endsWith('cup.toml')) {
             return [];
         }
-        return CompletionItemProvider.keywords.map(keyword => {
-            let result = new vscode.CompletionItem(keyword, vscode.CompletionItemKind.Keyword);
-            return result;
-        });
     }
 };
 
@@ -329,7 +345,7 @@ class PathCompletionItemProvider implements vscode.CompletionItemProvider {
         console.log('name', name);
         if (!name) { return []; }
         // 判断是否属于路径配置字段
-        if (['sources', 'includes', 'link_dirs'].includes(name)) {
+        if (['sources', 'includes', 'link_dirs', 'compile_commands', 'path'].includes(name)) {
             const prefix = document.lineAt(position.line).text.slice(0, position.character);
             const last_quote = prefix.lastIndexOf('"') > prefix.lastIndexOf("'") ? '"' : "'";
             const last_slash = prefix.lastIndexOf('/') > prefix.lastIndexOf('\\') ? '/' : '\\';
@@ -363,14 +379,238 @@ class PathCompletionItemProvider implements vscode.CompletionItemProvider {
     }
 };
 
+class EnterCompletionItemProvider implements vscode.CompletionItemProvider {
+    provideCompletionItems(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        token: vscode.CancellationToken,
+        context: vscode.CompletionContext)
+        : vscode.ProviderResult<vscode.CompletionItem[]> {
+        if (!document.fileName.endsWith('cup.toml')) {
+            return [];
+        }
+
+        const table = get_table_title(document, position);
+        console.log('table_name', table);
+        const target_table = [
+            { label: 'sources', kind: vscode.CompletionItemKind.Property },
+            { label: 'includes', kind: vscode.CompletionItemKind.Property },
+            { label: 'defines', kind: vscode.CompletionItemKind.Property },
+            { label: 'link_dirs', kind: vscode.CompletionItemKind.Property },
+            { label: 'link_libs', kind: vscode.CompletionItemKind.Property },
+            { label: 'link_options', kind: vscode.CompletionItemKind.Property },
+            { label: 'compile_options', kind: vscode.CompletionItemKind.Property },
+            { label: 'compiler_features', kind: vscode.CompletionItemKind.Property },
+        ];
+        if (table && check_pairs(document, position)) {
+            if (/\[[ ]*project[ ]*\]/gm.test(table)) {
+                const items = [
+                    { label: 'name', detail: '(require)', kind: vscode.CompletionItemKind.Property },
+                    { label: 'type', detail: '(require)', kind: vscode.CompletionItemKind.Property },
+                    { label: 'version', detail: '(require)', kind: vscode.CompletionItemKind.Property },
+                    { label: 'license', kind: vscode.CompletionItemKind.Property },
+                ];
+                return items.map(item => {
+                    return new vscode.CompletionItem({
+                        label: item.label,
+                        detail: item.detail
+                    }, item.kind);
+                });
+            }
+            if (/\[[ ]*build[ ]*\]/gm.test(table)) {
+                const items = [
+                    { label: 'generator', kind: vscode.CompletionItemKind.Property },
+                    { label: 'jobs', kind: vscode.CompletionItemKind.Property },
+                    { label: 'stdc', kind: vscode.CompletionItemKind.Property },
+                    { label: 'stdcxx', kind: vscode.CompletionItemKind.Property },
+                    { label: 'features', kind: vscode.CompletionItemKind.Property },
+                ];
+                items.push(...target_table);
+                return items.map(item => {
+                    return new vscode.CompletionItem(item.label, item.kind);
+                });
+            }
+            if (/\[[ ]*((build)|(tests)|(examples))[ ]*\.[ ]*((debug)|(release))\]/gm.test(table) ||
+                /\[[ ]*((tests)|(examples))[ ]*\]/gm.test(table) ||
+                /\[[ ]*((feature)|(generator)|(target))\.".*?"(.((debug)|(release)))?\]/gm.test(table)
+            ) {
+                return target_table.map(item => {
+                    return new vscode.CompletionItem(item.label, item.kind);
+                });
+            }
+            if (/\[[ ]*build[ ]*\.[ ]*export[ ]*\]/g.test(table)) {
+                return [new vscode.CompletionItem('compile_commands', vscode.CompletionItemKind.Property)];
+            }
+        }
+    }
+};
+
+class TableCompletionItemProvider implements vscode.CompletionItemProvider {
+    provideCompletionItems(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        token: vscode.CancellationToken,
+        context: vscode.CompletionContext)
+        : vscode.ProviderResult<vscode.CompletionItem[]> {
+        if (!document.fileName.endsWith('cup.toml')) {
+            return [];
+        }
+        const line = document.lineAt(position.line).text.trim();
+        if (line.length > 1 && line[0] === '[') {
+            return CompletionItemProvider.tables.map(table => {
+                return new vscode.CompletionItem(table, vscode.CompletionItemKind.Struct);
+            });
+        }
+    }
+};
+
+class DotCompletionItemProvider implements vscode.CompletionItemProvider {
+    provideCompletionItems(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        token: vscode.CancellationToken,
+        context: vscode.CompletionContext)
+        : vscode.ProviderResult<vscode.CompletionItem[]> {
+        if (!document.fileName.endsWith('cup.toml')) {
+            return [];
+        }
+        const line = document.lineAt(position.line).text.trim();
+        const before_cursor = line.slice(0, position.character);
+        if (/^\[[ ]*((((feature)|(generator)|(target))\.".*?")|(tests)|(examples)|(build))/gm.test(before_cursor)) {
+            const items = [
+                { label: 'debug' },
+                { label: 'release' }
+            ];
+            return items.map(item => {
+                return new vscode.CompletionItem(item.label, vscode.CompletionItemKind.Property);
+            });
+        }
+    }
+};
+
+class FeatureCompletionItemProvider implements vscode.CompletionItemProvider {
+    public static features = [
+        { label: 'c_std_90', detail: '(C)', description: 'Compiler mode is at least C 90.' },
+        { label: 'c_std_99', detail: '(C)', description: 'Compiler mode is at least C 99.' },
+        { label: 'c_std_11', detail: '(C)', description: 'Compiler mode is at least C 11.' },
+        { label: 'c_std_17', detail: '(C)', description: 'Compiler mode is at least C 17.' },
+        { label: 'c_std_23', detail: '(C)', description: 'Compiler mode is at least C 23.' },
+        { label: 'c_function_prototypes', detail: '(C)', description: 'Function prototypes, as defined in ISO/IEC 9899:1990.' },
+        { label: 'c_restrict', detail: '(C)', description: '`restrict` keyword, as defined in ISO/IEC 9899:1999.' },
+        { label: 'c_static_assert', detail: '(C)', description: 'Static assert, as defined in ISO/IEC 9899:2011.' },
+        { label: 'c_variadic_macros', detail: '(C)', description: 'Variadic macros, as defined in ISO/IEC 9899:1999.' },
+        { label: 'cuda_std_03', detail: '(CUDA)', description: 'Compiler mode is at least CUDA/C++ 03.' },
+        { label: 'cuda_std_11', detail: '(CUDA)', description: 'Compiler mode is at least CUDA/C++ 11.' },
+        { label: 'cuda_std_14', detail: '(CUDA)', description: 'Compiler mode is at least CUDA/C++ 14.' },
+        { label: 'cuda_std_17', detail: '(CUDA)', description: 'Compiler mode is at least CUDA/C++ 17.' },
+        { label: 'cuda_std_20', detail: '(CUDA)', description: 'Compiler mode is at least CUDA/C++ 20.' },
+        { label: 'cuda_std_23', detail: '(CUDA)', description: 'Compiler mode is at least CUDA/C++ 23.' },
+        { label: 'cuda_std_26', detail: '(CUDA)', description: 'Compiler mode is at least CUDA/C++ 26.' },
+        { label: 'cxx_std_98', detail: '(C++)', description: 'Compiler mode is at least C++ 98.' },
+        { label: 'cxx_std_11', detail: '(C++)', description: 'Compiler mode is at least C++ 11.' },
+        { label: 'cxx_std_14', detail: '(C++)', description: 'Compiler mode is at least C++ 14.' },
+        { label: 'cxx_std_17', detail: '(C++)', description: 'Compiler mode is at least C++ 17.' },
+        { label: 'cxx_std_20', detail: '(C++)', description: 'Compiler mode is at least C++ 20.' },
+        { label: 'cxx_std_23', detail: '(C++)', description: 'Compiler mode is at least C++ 23.' },
+        { label: 'cxx_std_26', detail: '(C++)', description: 'Compiler mode is at least C++ 26.' },
+        { label: 'cxx_template_template_parameters', detail: '(C++98)', description: 'Template template parameters, as defined in ISO/IEC 14882:1998.' },
+        { label: 'cxx_alias_templates', detail: '(C++11)', description: 'Template aliases, as defined in N2258.' },
+        { label: 'cxx_alignas', detail: '(C++11)', description: 'Alignment control alignas, as defined in N2341.' },
+        { label: 'cxx_alignof', detail: '(C++11)', description: 'Alignment control alignof, as defined in N2341.' },
+        { label: 'cxx_attributes', detail: '(C++11)', description: 'Generic attributes, as defined in N2761.' },
+        { label: 'cxx_auto_type', detail: '(C++11)', description: 'Automatic type deduction, as defined in N1984.' },
+        { label: 'cxx_constexpr', detail: '(C++11)', description: 'Constant expressions, as defined in N2235.' },
+        { label: 'cxx_decltype_incomplete_return_types', detail: '(C++11)', description: 'Decltype on incomplete return types, as defined in N3276.' },
+        { label: 'cxx_decltype', detail: '(C++11)', description: 'Decltype, as defined in N2343.' },
+        { label: 'cxx_default_function_template_args', detail: '(C++11)', description: 'Default template arguments for function templates, as defined in DR226' },
+        { label: 'cxx_defaulted_functions', detail: '(C++11)', description: 'Defaulted functions, as defined in N2346.' },
+        { label: 'cxx_defaulted_move_initializers', detail: '(C++11)', description: 'Defaulted move initializers, as defined in N3053.' },
+        { label: 'cxx_delegating_constructors', detail: '(C++11)', description: 'Delegating constructors, as defined in N1986.' },
+        { label: 'cxx_deleted_functions', detail: '(C++11)', description: 'Deleted functions, as defined in N2346.' },
+        { label: 'cxx_enum_forward_declarations', detail: '(C++11)', description: 'Enum forward declarations, as defined in N2764.' },
+        { label: 'cxx_explicit_conversions', detail: '(C++11)', description: 'Explicit conversion operators, as defined in N2437.' },
+        { label: 'cxx_extended_friend_declarations', detail: '(C++11)', description: 'Extended friend declarations, as defined in N1791.' },
+        { label: 'cxx_extern_templates', detail: '(C++11)', description: 'Extern templates, as defined in N1987.' },
+        { label: 'cxx_final', detail: '(C++11)', description: 'Override control final keyword, as defined in N2928, N3206 and N3272.' },
+        { label: 'cxx_func_identifier', detail: '(C++11)', description: 'Predefined __func__ identifier, as defined in N2340.' },
+        { label: 'cxx_generalized_initializers', detail: '(C++11)', description: 'Initializer lists, as defined in N2672.' },
+        { label: 'cxx_inheriting_constructors', detail: '(C++11)', description: 'Inheriting constructors, as defined in N2540.' },
+        { label: 'cxx_inline_namespaces', detail: '(C++11)', description: 'Inline namespaces, as defined in N2535.' },
+        { label: 'cxx_lambdas', detail: '(C++11)', description: 'Lambda functions, as defined in N2927.' },
+        { label: 'cxx_local_type_template_args', detail: '(C++11)', description: 'Local and unnamed types as template arguments, as defined in N2657.' },
+        { label: 'cxx_long_long_type', detail: '(C++11)', description: 'long long type, as defined in N1811.' },
+        { label: 'cxx_noexcept', detail: '(C++11)', description: 'Exception specifications, as defined in N3050.' },
+        { label: 'cxx_nonstatic_member_init', detail: '(C++11)', description: 'Non-static data member initialization, as defined in N2756.' },
+        { label: 'cxx_nullptr', detail: '(C++11)', description: 'Null pointer, as defined in N2431.' },
+        { label: 'cxx_override', detail: '(C++11)', description: 'Override control override keyword, as defined in N2928, N3206 and N3272.' },
+        { label: 'cxx_range_for', detail: '(C++11)', description: 'Range-based for, as defined in N2930.' },
+        { label: 'cxx_raw_string_literals', detail: '(C++11)', description: 'Raw string literals, as defined in N2442.' },
+        { label: 'cxx_reference_qualified_functions', detail: '(C++11)', description: 'Reference qualified functions, as defined in N2439.' },
+        { label: 'cxx_right_angle_brackets', detail: '(C++11)', description: 'Right angle bracket parsing, as defined in N1757.' },
+        { label: 'cxx_rvalue_references', detail: '(C++11)', description: 'R-value references, as defined in N2118.' },
+        { label: 'cxx_sizeof_member', detail: '(C++11)', description: 'Size of non-static data members, as defined in N2253.' },
+        { label: 'cxx_static_assert', detail: '(C++11)', description: 'Static assert, as defined in N1720.' },
+        { label: 'cxx_strong_enums', detail: '(C++11)', description: 'Strongly typed enums, as defined in N2347.' },
+        { label: 'cxx_thread_local', detail: '(C++11)', description: 'Thread-local variables, as defined in N2659.' },
+        { label: 'cxx_trailing_return_types', detail: '(C++11)', description: 'Automatic function return type, as defined in N2541.' },
+        { label: 'cxx_unicode_literals', detail: '(C++11)', description: 'Unicode string literals, as defined in N2442.' },
+        { label: 'cxx_uniform_initialization', detail: '(C++11)', description: 'Uniform initialization, as defined in N2640.' },
+        { label: 'cxx_unrestricted_unions', detail: '(C++11)', description: 'Unrestricted unions, as defined in N2544.' },
+        { label: 'cxx_user_literals', detail: '(C++11)', description: 'User-defined literals, as defined in N2765.' },
+        { label: 'cxx_variadic_macros', detail: '(C++11)', description: 'Variadic macros, as defined in N1653.' },
+        { label: 'cxx_variadic_templates', detail: '(C++11)', description: 'Variadic templates, as defined in N2242.' },
+        { label: 'cxx_aggregate_default_initializers', detail: '(C++14)', description: 'Aggregate default initializers, as defined in N3605.' },
+        { label: 'cxx_attribute_deprecated', detail: '(C++14)', description: '[[deprecated]] attribute, as defined in N3760.' },
+        { label: 'cxx_binary_literals', detail: '(C++14)', description: 'Binary literals, as defined in N3472.' },
+        { label: 'cxx_contextual_conversions', detail: '(C++14)', description: 'Contextual conversions, as defined in N3323.' },
+        { label: 'cxx_decltype_auto', detail: '(C++14)', description: 'decltype(auto) semantics, as defined in N3638.' },
+        { label: 'cxx_digit_separators', detail: '(C++14)', description: 'Digit separators, as defined in N3781.' },
+        { label: 'cxx_generic_lambdas', detail: '(C++14)', description: 'Generic lambdas, as defined in N3649.' },
+        { label: 'cxx_lambda_init_captures', detail: '(C++14)', description: 'Initialized lambda captures, as defined in N3648.' },
+        { label: 'cxx_relaxed_constexpr', detail: '(C++14)', description: 'Relaxed constexpr, as defined in N3652.' },
+        { label: 'cxx_return_type_deduction', detail: '(C++14)', description: 'Return type deduction on normal functions, as defined in N3386.' },
+        { label: 'cxx_variable_templates', detail: '(C++14)', description: 'Variable templates, as defined in N3651.' },
+    ];
+
+    provideCompletionItems(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        token: vscode.CancellationToken,
+        context: vscode.CompletionContext)
+        : vscode.ProviderResult<vscode.CompletionItem[]> {
+        if (!document.fileName.endsWith('cup.toml')) {
+            return [];
+        }
+        const name = get_field_name(document, position);
+        if (!name) { return []; }
+        if (name === 'compiler_features') {
+            return FeatureCompletionItemProvider.features.map(feature => {
+                return new vscode.CompletionItem({
+                    label: feature.label,
+                    detail: feature.detail,
+                    description: feature.description
+                }, vscode.CompletionItemKind.Property);
+            });
+        }
+    }
+};
+
 export function language_activate(context: vscode.ExtensionContext) {
     // 代码补全
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new CompletionItemProvider()));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
+        new EnterCompletionItemProvider(), '\n'));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new QuotesCompletionItemProvider(), '"', "'"));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new NumberCompletionItemProvider(), '=', ' ', ...'1234567890'));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new PathCompletionItemProvider(), '"', '/', '\\', "'"));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
+        new TableCompletionItemProvider(), '['));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
+        new DotCompletionItemProvider(), '.'));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
+        new FeatureCompletionItemProvider(), '"', "'"));
 }
