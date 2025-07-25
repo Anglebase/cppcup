@@ -193,7 +193,13 @@ export function activate(context: vscode.ExtensionContext) {
 
 	}));
 	context.subscriptions.push(vscode.commands.registerCommand('cppcup.debug', (url: vscode.Uri) => {
-		run_project(true, url.fsPath);
+		check_runable(url.fsPath).then(runable => {
+			if (!runable) {
+				vscode.window.showErrorMessage('Not a runable project or file.');
+				return;
+			}
+			run_project(true, url.fsPath);
+		});
 	}));
 
 	vscode.window.onDidChangeActiveTextEditor(
