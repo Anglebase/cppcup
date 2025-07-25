@@ -1,7 +1,7 @@
 {
   "name": "cppcup",
   "displayName": "Cup",
-  "description": "A new C/C++ Project&Package Manager support for VSCode.",
+  "description": "VSCode supports the new C/C++ Project&Package Manager Cup.",
   "version": "0.0.1",
   "keywords": [
     "cpp",
