@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import os from 'os';
+import { assert } from 'console';
 
 function get_field_name(document: vscode.TextDocument, position: vscode.Position) {
     // 查找光标之前等号位置
@@ -33,7 +34,7 @@ function get_table_title(document: vscode.TextDocument, position: vscode.Positio
         }
         line--;
     }
-    return find ? document.lineAt(line).text.trim() : null;
+    return find ? line : null;
 }
 
 function check_pairs(document: vscode.TextDocument, position: vscode.Position) {
@@ -390,7 +391,8 @@ class EnterCompletionItemProvider implements vscode.CompletionItemProvider {
             return [];
         }
 
-        const table = get_table_title(document, position);
+        const table_title_at = get_table_title(document, position);
+        const table = table_title_at ? document.lineAt(table_title_at).text.trim() : null;
         console.log('table_name', table);
         const target_table = [
             { label: 'sources', kind: vscode.CompletionItemKind.Property },
@@ -595,6 +597,60 @@ class FeatureCompletionItemProvider implements vscode.CompletionItemProvider {
     }
 };
 
+class DependencyCompletionItemProvider implements vscode.CompletionItemProvider {
+    public static dependencies = [
+        new vscode.CompletionItem('url', vscode.CompletionItemKind.Property),
+        new vscode.CompletionItem('path', vscode.CompletionItemKind.Property),
+        new vscode.CompletionItem('version', vscode.CompletionItemKind.Property),
+        new vscode.CompletionItem('features', vscode.CompletionItemKind.Property),
+        new vscode.CompletionItem('optional', vscode.CompletionItemKind.Property),
+    ];
+
+    provideCompletionItems(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        token: vscode.CancellationToken,
+        context: vscode.CompletionContext)
+        : vscode.ProviderResult<vscode.CompletionItem[]> {
+        if (!document.fileName.endsWith('cup.toml')) {
+            return [];
+        }
+        const title_at = get_table_title(document, position);
+        const title = title_at ? document.lineAt(title_at).text.trim() : '';
+        if (!title || !title_at) { return []; }
+        if (/\[[ ]*dependencies[ ]*\]/g.test(title)) {
+            const before = document.getText(new vscode.Range(new vscode.Position(title_at, 0), position));
+            for (let i = before.length - 1; i >= 0; i--) {
+                switch (before[i]) {
+                    case '{':
+                        return DependencyCompletionItemProvider.dependencies;
+                    case '}':
+                        return [];
+                }
+            }
+        }
+    }
+};
+
+class DependencyTableCompletionItemProvider implements vscode.CompletionItemProvider {
+    provideCompletionItems(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        token: vscode.CancellationToken,
+        context: vscode.CompletionContext)
+        : vscode.ProviderResult<vscode.CompletionItem[]> {
+        if (!document.fileName.endsWith('cup.toml')) {
+            return [];
+        }
+        const title_at = get_table_title(document, position);
+        const title = title_at ? document.lineAt(title_at).text.trim() : '';
+        if (!title || !title_at) { return []; }
+        if (/\[[ ]*dependencies[ ]*\.[ ]*[a-zA-Z0-9_]+\]/g.test(title) && check_pairs(document, position)) {
+            return DependencyCompletionItemProvider.dependencies;
+        }
+    }
+};
+
 export function language_activate(context: vscode.ExtensionContext) {
     // 代码补全
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
@@ -613,4 +669,8 @@ export function language_activate(context: vscode.ExtensionContext) {
         new DotCompletionItemProvider(), '.'));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new FeatureCompletionItemProvider(), '"', "'"));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
+        new DependencyCompletionItemProvider(), '{', ','));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
+        new DependencyTableCompletionItemProvider(), '\n'));
 }
