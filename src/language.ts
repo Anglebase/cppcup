@@ -351,11 +351,9 @@ class PathCompletionItemProvider implements vscode.CompletionItemProvider {
             const last_quote = prefix.lastIndexOf('"') > prefix.lastIndexOf("'") ? '"' : "'";
             const last_slash = prefix.lastIndexOf('/') > prefix.lastIndexOf('\\') ? '/' : '\\';
             let dir = prefix.slice(prefix.lastIndexOf(last_quote) + 1, prefix.lastIndexOf(last_slash) + 1);
-            if (!vscode.workspace.workspaceFolders) { return []; }
-            const workspace_dir = vscode.workspace.workspaceFolders[0].uri.fsPath;
-            if (!dir) { dir = workspace_dir; }
+            if (!dir) { dir = document.uri.fsPath; }
             if (!path.isAbsolute(dir)) {
-                dir = path.join(workspace_dir, dir);
+                dir = path.join(document.uri.fsPath, dir);
             }
             // 解析路径所定位的位置
             dir = path.normalize(dir);
@@ -483,6 +481,9 @@ class DotCompletionItemProvider implements vscode.CompletionItemProvider {
                 { label: 'debug' },
                 { label: 'release' }
             ];
+            if (/\[[ ]*build[ ]*\.[ ]*export[ ]*\]/g.test(before_cursor)) {
+                items.push({ label: 'compile_commands' });
+            }
             return items.map(item => {
                 return new vscode.CompletionItem(item.label, vscode.CompletionItemKind.Property);
             });
