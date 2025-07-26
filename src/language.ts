@@ -425,6 +425,7 @@ class EnterCompletionItemProvider implements vscode.CompletionItemProvider {
                     { label: 'stdc', kind: vscode.CompletionItemKind.Property },
                     { label: 'stdcxx', kind: vscode.CompletionItemKind.Property },
                     { label: 'features', kind: vscode.CompletionItemKind.Property },
+                    { label: 'languages', kind: vscode.CompletionItemKind.Property },
                 ];
                 items.push(...target_table);
                 return items.map(item => {
@@ -589,11 +590,45 @@ class FeatureCompletionItemProvider implements vscode.CompletionItemProvider {
         if (!name) { return []; }
         if (name === 'compiler_features') {
             return FeatureCompletionItemProvider.features.map(feature => {
-                return new vscode.CompletionItem({
-                    label: feature.label,
-                    detail: feature.detail,
-                    description: feature.description
-                }, vscode.CompletionItemKind.Property);
+                return new vscode.CompletionItem(feature, vscode.CompletionItemKind.Property);
+            });
+        }
+    }
+};
+
+class LanguageCompletionItemProvider implements vscode.CompletionItemProvider {
+    public static languages = [
+        { label: 'C' },
+        { label: 'CXX', detail: '(C++)' },
+        { label: 'CSharp', detail: '(C#)', description: 'Since CMake 3.8' },
+        { label: 'CUDA', description: 'Since CMake 3.8' },
+        { label: 'OBJC', detail: '(Object-C)', description: 'Since CMake 3.16' },
+        { label: 'OBJCXX', detail: '(Object-C++)', description: 'Since CMake 3.16' },
+        { label: 'Fortran' },
+        { label: 'HIP', description: 'Since CMake 3.21' },
+        { label: 'ISPC', description: 'Since CMake 3.18' },
+        { label: 'Swift', description: 'Since CMake 3.15' },
+        { label: 'ASM' },
+        { label: 'ASM_NASM' },
+        { label: 'ASM_MARMASM', description: 'Since CMake 3.26' },
+        { label: 'ASM_MASM' },
+        { label: 'ASM-ATT' },
+    ];
+
+    provideCompletionItems(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        token: vscode.CancellationToken,
+        context: vscode.CompletionContext)
+        : vscode.ProviderResult<vscode.CompletionItem[]> {
+        if (!document.fileName.endsWith('cup.toml')) {
+            return [];
+        }
+        const name = get_field_name(document, position);
+        if (!name) { return []; }
+        if (name === 'languages') {
+            return LanguageCompletionItemProvider.languages.map(language => {
+                return new vscode.CompletionItem(language, vscode.CompletionItemKind.Property);
             });
         }
     }
@@ -671,6 +706,8 @@ export function language_activate(context: vscode.ExtensionContext) {
         new DotCompletionItemProvider(), '.'));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new FeatureCompletionItemProvider(), '"', "'"));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
+        new LanguageCompletionItemProvider(), '"', "'"));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
         new DependencyCompletionItemProvider(), '{', ','));
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('toml',
