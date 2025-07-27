@@ -81,7 +81,7 @@ class CompletionItemProvider implements vscode.CompletionItemProvider {
         'generator',
         'features',
         'feature',
-        'dependecies',
+        'dependencies',
         'tests',
         'examples'
     ];
